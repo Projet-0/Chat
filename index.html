@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+      #input:focus { outline: none; }
+      #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages > li { padding: 0.5rem 1rem; }
+      #messages > li:nth-child(odd) { background: #efefef; }
+    </style>
+  </head>
+  <body>
+
+
+
+    <ul id="messages"></ul>
+    <form id="form" action="">
+      <input id="input" autocomplete="off" /><button>Send</button>
+    </form>
+
+    <!-- Utilisateur -->
+    <form id="login" action="">
+      <input id="user_input" autocomplete="off" placeholder="Username" /><button>Send</button>
+    </form>
+
+    <h1>La liste des utilisateur connectés</h1>
+    <ul id="list_user"></ul>
+    <!-- fin Utilisateur -->
+
+    <h1> Vous êtes <span id="current-user-span"></span></h1>
+
+    <!-- ENVOYER UN DM  -->
+    <ul id="private-message"></ul>
+    <form id="private-message-form" action="">
+      <input id="private-message-receiver" placeholder="Name" autocomplete="off" />
+      <input id="private-message-content" placeholder="Content" autocomplete="off" />
+      <button>Envoyer un dm</button>
+    </form>
+    <!-- FIN DM -->
+
+    <!-- SECTION RECEPTION DM -->
+    <div class="dm">
+      <div>
+        <h1>Messages privés</h1>
+        <ul id="add-dm">
+
+        </ul>
+      </div>
+
+    </div>
+    <!-- FIN AFFICHAGE DM -->
+
+    <!-- IS TYPING FONCTIONNALITY -->
+    <div id="typing"></div>
+
+
+
+    <!------------------------------------- DEBUT DU SCRIPT ----------------------------------------------->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+    var socket = io();
+    
+    // Message
+    var form = document.getElementById('form');
+    var input = document.getElementById('input');
+
+    // User
+    var login = document.getElementById('login')
+    var userList = document.getElementById("list_user");
+    var current_user_span = document.getElementById("current-user-span")
+    
+    // LE USER DE LA PAGE EST : current_user LA VARIABLE user_input.value est le nom du user
+    var current_user ; 
+
+    // ENVOI MESSAGE PRIVES
+    var private_message_form = document.getElementById("private-message-form")
+    var receiver = document.getElementById('private-message-receiver');
+    var private_message_content = document.getElementById('private-message-content');
+    var dm_box = document.getElementById('add-dm')
+    // 
+    var receiver_dm ;
+    var content_dm ;
+    
+
+    // Is typing 
+    let timeout = null;
+
+        login.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (user_input.value) {
+          current_user = user_input.value; // VAriable qu'on pourra faire transiter
+          current_user_span.textContent = current_user  ; // Affichage sur la page
+
+          socket.emit('new_user', current_user); // on envoie au back
+          
+          console.log("je rentre dans l'envemenet le user input a été cliqué et il vaut : " + current_user)
+          user_input.value = '';
+          login.hidden = true;
+        }
+      });
+
+      socket.on('new_user',function(list_user) {
+        userList.innerHTML = "";
+        for(var i = 0; i < list_user.length; i++){
+          var newUser = document.createElement("li");
+          newUser.innerHTML = list_user[i];
+          userList.appendChild(newUser);
+          console.log(newUser);
+        } 
+
+      });
+      // utilisateur
+      
+      // DEBUT NOUVEAU USER ///////////////////////////////////////////////////
+
+      socket.on('send_user_list', function(user_list) {
+          console.log(user_list.length)
+          var temp_value = user_list.length
+          for (var i = 0 ; i < temp_value ; i++) {
+            console.log(user_list_display.innerText)
+              if (!user_list_display.innerHTML.includes(user_list[i])) {
+                console.log("Entrée dans la boucle");
+                var li = document.createElement('li');
+                li.textContent = user_list[i];
+                console.log(li.textContent);
+                user_list_display.appendChild(li);
+              }
+          }
+        })
+      // FIN NOUVEAU USER ///////////////////////////////////////////////////
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (input.value) {
+        socket.emit('chat message', input.value);
+        input.value = '';
+        }
+    });
+    
+    // Lecture du Message de chat
+    socket.on('chat message', function(msg,chat_user) {
+      console.log("Ce message a été écrit par " + chat_user )
+      var item = document.createElement('li');
+      item.textContent =chat_user+" : "+msg ;
+      messages.appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+     });
+
+
+    window.scrollTo(0, document.body.scrollHeight);
+
+   // TEST récupération du msg
+    
+    input.addEventListener("input", (event) => {
+      //const inputValue = event.target.value;
+      //console.log(inputValue)
+
+      socket.emit('change')
+
+    })
+    // FIN TEST
+    // Envoi d'un message privé
+
+    private_message_form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+      console.log('je rentre dans le listener')
+      content_dm = private_message_content.value
+      receiver_dm = receiver.value 
+
+      console.log('voici le contenu', current_user,receiver_dm,content_dm,)
+
+      socket.emit('private-message',current_user,receiver_dm,content_dm)
+
+      private_message_content.value = ''
+      receiver_dm = receiver.value = '' 
+    })
+
+    socket.on('private-message-send', function(user__,receiver__,content__) {
+      if(current_user == receiver__) {
+        console.log('je dois bien le recevoir')
+        var item = document.createElement('li');
+        item.textContent =user__+" : "+content__ ;
+        dm_box.appendChild(item);
+      }
+      
+      if (current_user == user__) {
+        console.log('je suis l envoyer')
+        var item = document.createElement('li');
+        item.textContent = "Vous : "+content__ ;
+        dm_box.appendChild(item);
+      }
+
+     });
+
+
+
+    //  IS TYPING
+    
+    private_message_content.addEventListener("keydown", function(){
+    clearTimeout(timeout);
+    socket.emit('typing', current_user);
+    timeout = setTimeout(() => {
+        document.getElementById("typing").textContent = "";
+    }, 1000);
+    });
+
+
+    socket.on('typing', function(user) {
+        document.getElementById("typing").textContent = user + " is typing";
+    })
+
+    </script>
+
+  </body>
+</html>
